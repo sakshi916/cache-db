@@ -1,3 +1,6 @@
+package server;
+
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
@@ -17,4 +20,12 @@ public class Connection {
         outbox.add(ByteBuffer.wrap(bytes));
     }
     boolean hasPendingWrites() { return !outbox.isEmpty(); }
+    // add to server.Connection:
+    ByteArrayOutputStream replyBuf = new ByteArrayOutputStream();
+    // helper to flush scratch → outbox and reset scratch:
+    void flushReply() {
+        byte[] bytes = replyBuf.toByteArray();
+        outbox.add(ByteBuffer.wrap(bytes));
+        replyBuf.reset();   // reuse the same ByteArrayOutputStream next command
+    }
 }

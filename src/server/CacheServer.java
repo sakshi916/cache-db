@@ -1,3 +1,7 @@
+package server;
+
+import exceptions.TypeException;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -42,8 +46,19 @@ static void handleRead(SelectionKey key) throws IOException {
         if(!str.isEmpty()){
             Command cmd = store.parse(str);
             if (cmd == null) continue;
-            String reply = store.execute(cmd) + "\r\n";
-            acc.queueReply(reply.getBytes(StandardCharsets.UTF_8));
+            RespWriter w = new RespWriter(acc.replyBuf);
+            try {
+                store.execute(cmd,w);
+            } catch (TypeException e) {
+                acc.replyBuf.reset();
+                w.writeError(e.getMessage());
+            }
+            // --- TEMPORARY DEBUG: see the exact RESP bytes ---
+            String debug = acc.replyBuf.toString(StandardCharsets.UTF_8)
+                    .replace("\r", "\\r").replace("\n", "\\n");
+            System.out.println("REPLY BYTES: " + debug);
+// -------------------------------------------------
+            acc.flushReply();
         }
     }
     flush(key);
