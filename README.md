@@ -72,3 +72,38 @@ Then connect with the included Java client:
 ```bash
 java -cp out client.RespClient
 ```
+
+Example:
+```
+SET name redis
+OK
+GET name
+"redis"
+RPUSH fruits apple banana cherry
+(integer) 3
+LRANGE fruits 0 -1
+"apple"
+"banana"
+"cherry"
+EXPIRE name 60
+(integer) 1
+TTL name
+(integer) 60
+```
+
+Because it speaks RESP, the official `redis-cli` also works:
+`redis-cli -p 6380 PING`.
+
+## Roadmap
+
+- [ ] Hashes (`HSET`/`HGET`/`HDEL`/`HGETALL`/`HLEN`)
+- [ ] Sets (`SADD`/`SREM`/`SMEMBERS`/`SISMEMBER`/`SCARD`)
+- [ ] Sorted sets
+- [ ] Inline expiry options on `SET` (`EX`/`PX`)
+- [ ] Housekeeping commands (`EXISTS`, `TYPE`, `KEYS`, `FLUSHDB`)
+
+## Notes / known simplifications
+
+- Active expiration shuffles the full TTL keyset per round (O(n)); real Redis
+  samples random keys in O(1) from its own hash table.
+- RESP bulk-string lengths use char length, which equals byte length for ASCII.
