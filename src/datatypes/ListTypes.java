@@ -21,16 +21,16 @@ public class ListTypes {
         args.subList(1, args.size()).forEach(arr::addFirst);
         w.writeInteger(arr.size());
     }
-    public void range(List<String> args,RespWriter w) throws TypeException {
-        if (args.size() != 3)w.writeError("ERR wrong number of arguments");
+    public void range(List<String> args, RespWriter w) throws TypeException {
+        if (args.size() != 3) { w.writeError("ERR wrong number of arguments for 'lrange'"); return; }
         ArrayDeque<String> arr = asList(args.get(0));
-        if (arr == null || arr.isEmpty()) { w.writeBulk(null); return; }
-        int start=0, stop=0;
+        if (arr == null || arr.isEmpty()) { w.writeArrayLen(0); return; }
+        int start, stop;
         try {
             start = Integer.parseInt(args.get(1));
             stop  = Integer.parseInt(args.get(2));
         } catch (NumberFormatException e) {
-            w.writeError("ERR wrong number of arguments");
+            w.writeError("ERR value is not an integer or out of range");
             return;
         }
         int size = arr.size();
@@ -38,8 +38,10 @@ public class ListTypes {
         if (stop  < 0) stop  += size;
         start = Math.max(start, 0);
         stop  = Math.min(stop, size - 1);
-        if (start > stop) { w.writeBulk(null); return; }
-        new ArrayList<>(arr).subList(start, stop + 1).forEach(w::writeBulk);
+        if (start > stop) { w.writeArrayLen(0); return; }
+        List<String> sub = new ArrayList<>(arr).subList(start, stop + 1);
+        w.writeArrayLen(sub.size());
+        sub.forEach(w::writeBulk);
     }
     public void rpush(List<String> args, RespWriter w) throws TypeException {
         if (args.size() < 2) { w.writeError("ERR wrong number of arguments for 'rpush'"); return; }

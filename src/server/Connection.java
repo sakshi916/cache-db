@@ -28,4 +28,17 @@ public class Connection {
         outbox.add(ByteBuffer.wrap(bytes));
         replyBuf.reset();   // reuse the same ByteArrayOutputStream next command
     }
+    // in Connection:
+    private final ByteArrayOutputStream inbound = new ByteArrayOutputStream();
+
+    void appendInbound(byte[] data, int n) { inbound.write(data, 0, n); }
+    byte[] inboundBytes() { return inbound.toByteArray(); }   // note: allocates a copy
+    int    inboundLen()   { return inbound.size(); }
+
+    // remove the first `consumed` bytes (after a successful parse)
+    void consumeInbound(int consumed) {
+        byte[] all = inbound.toByteArray();
+        inbound.reset();
+        inbound.write(all, consumed, all.length - consumed);   // keep the leftover
+    }
 }

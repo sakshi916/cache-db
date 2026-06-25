@@ -1,6 +1,7 @@
 package server;
 
 import exceptions.TypeException;
+import protocol.RespParser;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -34,32 +35,32 @@ static void handleRead(SelectionKey key) throws IOException {
     }
     if (n == 0) return;
     buf.flip();
-    String text = StandardCharsets.UTF_8.decode(buf).toString();
-    Connection acc = (Connection) key.attachment();
-    acc.appendInbound(text);
-    while(true){
-        int i=acc.stringBuilder.indexOf("\n");
-        if(i==-1)break;
-        String str=acc.stringBuilder.substring(0,i);
-        acc.stringBuilder.delete(0,i+1);
-        str=str.trim();
-        if(!str.isEmpty()){
-            Command cmd = store.parse(str);
-            if (cmd == null) continue;
-            RespWriter w = new RespWriter(acc.replyBuf);
-            try {
-                store.execute(cmd,w);
-            } catch (TypeException e) {
-                acc.replyBuf.reset();
-                w.writeError(e.getMessage());
-            }
-            // --- TEMPORARY DEBUG: see the exact RESP bytes ---
-            String debug = acc.replyBuf.toString(StandardCharsets.UTF_8)
-                    .replace("\r", "\\r").replace("\n", "\\n");
-            System.out.println("REPLY BYTES: " + debug);
-// -------------------------------------------------
-            acc.flushReply();
+    byte[] chunk = new byte[n];
+    buf.get(chunk);
+    Connection conn = (Connection) key.attachment();
+    conn.appendInbound(chunk, n);
+
+    while (true) {
+        RespParser.Parsed p;
+        try {
+            p = RespParser.tryParse(conn.inboundBytes(), conn.inboundLen());
+        } catch (RespParser.ProtocolException e) {
+            // fatal framing error → reply error and close this client
+            // (write "-ERR Protocol error: ...\r\n" then close)
+            conn.replyBuf.reset();
+            new RespWriter(conn.replyBuf).writeError("ERR Protocol error: " + e.getMessage());
+            conn.flushReply();
+            flush(key);
+            client.close(); key.cancel();
+            return;
         }
+        if (p == null) break;                    // incomplete → wait for more
+        conn.consumeInbound(p.consumed());
+        Command cmd = p.command();
+        RespWriter w = new RespWriter(conn.replyBuf);
+        try { store.execute(cmd, w); }
+        catch (TypeException e) { conn.replyBuf.reset(); w.writeError(e.getMessage()); }
+        conn.flushReply();
     }
     flush(key);
 }
