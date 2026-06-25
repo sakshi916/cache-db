@@ -2,6 +2,7 @@ package datatypes;
 
 import exceptions.TypeException;
 import server.RespWriter;
+import server.Store;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -10,8 +11,8 @@ import java.util.Map;
 
 public class ListTypes {
 
-    private final Map<String, Object> store;
-    public ListTypes(Map<String, Object> store) { this.store = store; }
+    private final Store store;
+    public ListTypes(Store store) { this.store = store; }
     public static final String WRONGTYPE =
             "WRONGTYPE Operation against a key holding the wrong kind of value";
     public void lpush(List<String> args,RespWriter w) throws TypeException {
@@ -56,7 +57,7 @@ public class ListTypes {
         ArrayDeque<String> arr = asList(args.get(0));
         if (arr == null || arr.isEmpty()) { w.writeBulk(null); return; }   // nil = $-1
         String v = arr.pollFirst();
-        if (arr.isEmpty()) store.remove(args.get(0));
+        if (arr.isEmpty()) store.delete(args.get(0));
         w.writeBulk(v);
     }
 
@@ -65,7 +66,7 @@ public class ListTypes {
         ArrayDeque<String> arr = asList(args.get(0));
         if (arr == null || arr.isEmpty()) { w.writeBulk(null); return; }
         String v = arr.pollLast();
-        if (arr.isEmpty()) store.remove(args.get(0));
+        if (arr.isEmpty()) store.delete(args.get(0));
         w.writeBulk(v);
     }
 
@@ -76,7 +77,7 @@ public class ListTypes {
     }
     @SuppressWarnings("unchecked")
     ArrayDeque<String> asList(String key) throws TypeException {
-        Object obj = store.get(key);
+        Object obj = store.lookup(key);
         if (obj == null) return null;                      // absent ≠ error
         if (!(obj instanceof ArrayDeque)) throw new TypeException(WRONGTYPE);
         return (ArrayDeque<String>) obj;

@@ -13,6 +13,7 @@ import java.util.Set;
 
 import static java.lang.System.out;
 public class CacheServer {
+    public static Executor executor;
     public static Store store;
     static void handleAccept(Selector selector, SelectionKey key) throws IOException {
         ServerSocketChannel server = (ServerSocketChannel) key.channel();
@@ -58,7 +59,7 @@ static void handleRead(SelectionKey key) throws IOException {
         conn.consumeInbound(p.consumed());
         Command cmd = p.command();
         RespWriter w = new RespWriter(conn.replyBuf);
-        try { store.execute(cmd, w); }
+        try { executor.execute(cmd, w); }
         catch (TypeException e) { conn.replyBuf.reset(); w.writeError(e.getMessage()); }
         conn.flushReply();
     }
@@ -91,6 +92,7 @@ static void handleRead(SelectionKey key) throws IOException {
         int port = 6380;
         Selector selector = Selector.open();
         store=new Store();
+         executor=new Executor(store);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.bind(new InetSocketAddress(port));
         server.configureBlocking(false);
@@ -102,9 +104,9 @@ static void handleRead(SelectionKey key) throws IOException {
         // --- THE EVENT LOOP ---
         while (true) {
 
-             selector.select();
+            selector.select(100);
 
-              Set<SelectionKey> keys = selector.selectedKeys();
+            Set<SelectionKey> keys = selector.selectedKeys();
              Iterator<SelectionKey> it = keys.iterator();
               while (it.hasNext()) {
                   SelectionKey key = it.next();
@@ -123,6 +125,7 @@ static void handleRead(SelectionKey key) throws IOException {
                      }catch(IOException ignored){}
                  }
             }
+            int reaped = store.activeExpireCycle();
         }
     }
 
